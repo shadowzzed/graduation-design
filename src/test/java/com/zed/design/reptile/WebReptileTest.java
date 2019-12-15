@@ -1,20 +1,23 @@
 package com.zed.design.reptile;
 
+import com.gargoylesoftware.htmlunit.BrowserVersion;
+import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
+import com.gargoylesoftware.htmlunit.WebClient;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.select.Elements;
 import org.junit.jupiter.api.Test;
+import org.junit.platform.commons.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author Zed
@@ -96,10 +99,43 @@ class WebReptileTest {
 
     @Test
     public void testGetCNKIContent() {
-        System.out.println(reptile.getCNKIContent("中文分词").getElementsByTag("table").attr("GridTableContent"));
+        System.out.println(reptile.getCNKIContent("中文分词"));
+//        Elements elementsByTag = reptile.getCNKIContent("中文分词").getElementsByClass("pageBar_top").select("tr");
+//        AtomicInteger count = new AtomicInteger();
+//        elementsByTag.forEach(element -> {
+//            if (StringUtils.isNotBlank(element.attr("bgcolor")))
+//                count.getAndIncrement();
+//        });
+//        System.out.println(count);
+        System.out.println(1);
+//        System.out.println(1);
 //        reptile.getCNKIContent("")
 //        Document document = reptile.getCNKIContent("中文分词");
 //        System.out.println(document.getElementsByTag("table").size());
     }
 
+
+    @Test
+    public void testSummary() throws IOException {
+//        WebClient webClient = new WebClient(BrowserVersion.CHROME);
+//        webClient.getOptions().setCssEnabled(false);
+//        webClient.getOptions().setJavaScriptEnabled(true);
+//        webClient.setAjaxController(new NicelyResynchronizingAjaxController());
+//        webClient.waitForBackgroundJavaScript(3000);
+//
+//        String summary = reptile.getSummary("<a class=\"fz14\" href='/kns/detail/detail.aspx?QueryID=6&CurRec=2&recid=&FileName=NJLD201906010&DbName=CJFDLAST2019&DbCode=CJFQ&yx=&pr=&URLID=&bsm=QS0103;' target='_blank'>区块链技术在学生档案管理中的应用模式探究</a>\n" +
+//                "\n", webClient);
+//        System.out.println(summary);
+
+//        reptile.getCNKIContent("中文分词");
+        Document document = Jsoup.connect("https://kns.cnki.net/KCMS/detail/detail.aspx?&dbcode=CJFQ&dbname=CJFDLAST2019&filename=NJLD201906010")
+                .userAgent(UA)
+                .get();
+        System.out.println(document.getElementById("ChDivSummary"));
+    }
+
+    @Test
+    public void testRep() {
+        reptile.getCNKIContent("中文分词");
+    }
 }

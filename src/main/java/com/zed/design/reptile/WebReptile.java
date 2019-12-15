@@ -7,10 +7,14 @@ import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.zed.design.core.Config;
+import com.zed.design.core.pojo.Paper;
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
+import org.jsoup.internal.StringUtil;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +23,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author Zed
@@ -33,6 +39,19 @@ public class WebReptile {
 
     private String UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36";
 
+    private static Pattern dbcode_pattern;
+
+    private static Pattern dbname_pattern;
+
+    private static Pattern filename_pattern;
+    static {
+        String dbcode = "DbCode=.*?&";
+        String dbname = "DbName=.*?&";
+        String filename = "FileName=.*?&";
+        dbcode_pattern = Pattern.compile(dbcode);
+        dbname_pattern = Pattern.compile(dbname);
+        filename_pattern = Pattern.compile(filename);
+    }
     //get cnki content
     public Document getCNKIContent(String msg) {
         // get webclient
@@ -53,20 +72,97 @@ public class WebReptile {
             input.setValueAttribute(msg);
             DomElement btnSearch = htmlPage.getElementById("btnSearch");
             HtmlPage htmlPage1 = (HtmlPage) btnSearch.click();
-            Map<String, String> cookies = new HashMap<>();
-            webClient.getCookieManager().getCookies().forEach(cookie -> cookies.put(cookie.getName(), cookie.getValue()));
+//            Map<String, String> cookies = new HashMap<>();
+//            webClient.getCookieManager().getCookies().forEach(cookie -> cookies.put(cookie.getName(), cookie.getValue()));
             String url = "https://kns.cnki.net/kns/brief/brief.aspx?pagename=ASP.brief_result_aspx&isinEn=1&dbPrefix=SCDB&dbCatalog=%e4%b8%ad%e5%9b%bd%e5%ad%a6%e6%9c%af%e6%96%87%e7%8c%ae%e7%bd%91%e7%bb%9c%e5%87%ba%e7%89%88%e6%80%bb%e5%ba%93&ConfigFile=SCDB.xml&research=off&t=";
             url += System.currentTimeMillis();
             url += "&keyValue=";
             url += URLEncoder.encode(msg, "utf-8");
             url += "&S=1&sorttype=";
             HtmlPage targetPage = (HtmlPage) webClient.getPage(url);
+            // get content
             document = Jsoup.parse(targetPage.asXml());
+            // get table
+            Elements content = document.getElementsByClass("pageBar_top").select("tr");
+            // get each row
+            for (Element row: content) {
+                if (StringUtils.isBlank(row.attr("bgcolor")))
+                    continue;
+                Elements td = row.getElementsByTag("td");
+                String name = null;
+                String summary = null;
+                String author = null;
+                String source = null;
+                String date = null;
+                String db = null;
+                String ref = null;
+                String downloads = null;
+                for (int i = 0; i < 8; i++) {
+                    switch (i) {
+                        case 1:
+                            name = td.get(i).text();
+                            summary = this.getSummary(td.get(i).getElementsByTag("a").attr("href"));
+                            break;
+                        case 2:
+                            author = td.get(i).text();
+                            break;
+                        case 3:
+                            source = td.get(i).text();
+                            break;
+                        case 4:
+                            date = td.get(i).text();
+                            break;
+                        case 5:
+                            db = td.get(i).text();
+                            break;
+                        case 6:
+                            ref = td.get(i).text();
+                            break;
+                        case 7:
+                            downloads = td.get(i).text();
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                Paper paper = new Paper(name, summary, author, source, db, date, ref, downloads);
+                System.out.println(paper);
+                // TODO save into db
+            }
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             webClient.close();
         }
         return document;
+    }
+
+    private String getSummary(String href) throws IOException {
+        String url = "https://kns.cnki.net/KCMS/detail/detail.aspx?";
+        Matcher dbcode = dbcode_pattern.matcher(href);
+        Matcher dbname = dbname_pattern.matcher(href);
+        Matcher filename = filename_pattern.matcher(href);
+        if (dbcode.find()) {
+            String dbcode_temp = dbcode.group();
+            String dbcode_str = dbcode_temp.substring(7, dbcode_temp.length() - 1);
+            url = url + "&dbcode=" + dbcode_str;
+        }
+        if (dbname.find()) {
+            String dbname_temp = dbname.group();
+            String dbname_str = dbname_temp.substring(7, dbname_temp.length() - 1);
+            url = url + "&dbname=" + dbname_str;
+        }
+        if (filename.find()) {
+            String filename_temp = filename.group();
+            String filename_str = filename_temp.substring(9, filename_temp.length() - 1);
+            url = url + "&filename=" + filename_str;
+        }
+        Document document = Jsoup.connect(url)
+                .userAgent(UA)
+                .get();
+        // TODO if is null there seem to be post on other websites still need to process
+        if (document.getElementById("ChDivSummary") == null)
+            return null;
+        return document.getElementById("ChDivSummary").text();
     }
 }
