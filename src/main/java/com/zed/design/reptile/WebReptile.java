@@ -95,7 +95,7 @@ public class WebReptile {
             int totalPages = Integer.parseInt(total_temp.substring(2));
             this.addURLs(nextPageList, totalPages);
             for (String nextURL: nextPageList)
-                this.getNextPagePaper(url, webClient);
+                this.getNextPagePaper(nextURL, webClient);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
