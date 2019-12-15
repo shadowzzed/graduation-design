@@ -21,7 +21,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -54,13 +56,8 @@ public class WebReptile {
     }
     //get cnki content
     public Document getCNKIContent(String msg) {
-        // get webclient
-        WebClient webClient = new WebClient(BrowserVersion.CHROME);
-        webClient.getOptions().setCssEnabled(false);
-        webClient.getOptions().setJavaScriptEnabled(true);
-        webClient.setAjaxController(new NicelyResynchronizingAjaxController());
-        webClient.waitForBackgroundJavaScript(3000);
-
+        List<String> nextPageList = new ArrayList<>();
+        WebClient webClient = this.getWebClient();
         // get html page
         HtmlPage htmlPage = null;
         Document document = null;
@@ -72,8 +69,6 @@ public class WebReptile {
             input.setValueAttribute(msg);
             DomElement btnSearch = htmlPage.getElementById("btnSearch");
             HtmlPage htmlPage1 = (HtmlPage) btnSearch.click();
-//            Map<String, String> cookies = new HashMap<>();
-//            webClient.getCookieManager().getCookies().forEach(cookie -> cookies.put(cookie.getName(), cookie.getValue()));
             String url = "https://kns.cnki.net/kns/brief/brief.aspx?pagename=ASP.brief_result_aspx&isinEn=1&dbPrefix=SCDB&dbCatalog=%e4%b8%ad%e5%9b%bd%e5%ad%a6%e6%9c%af%e6%96%87%e7%8c%ae%e7%bd%91%e7%bb%9c%e5%87%ba%e7%89%88%e6%80%bb%e5%ba%93&ConfigFile=SCDB.xml&research=off&t=";
             url += System.currentTimeMillis();
             url += "&keyValue=";
@@ -86,55 +81,84 @@ public class WebReptile {
             Elements content = document.getElementsByClass("pageBar_top").select("tr");
             // get each row
             for (Element row: content) {
-                if (StringUtils.isBlank(row.attr("bgcolor")))
-                    continue;
-                Elements td = row.getElementsByTag("td");
-                String name = null;
-                String summary = null;
-                String author = null;
-                String source = null;
-                String date = null;
-                String db = null;
-                String ref = null;
-                String downloads = null;
-                for (int i = 0; i < 8; i++) {
-                    switch (i) {
-                        case 1:
-                            name = td.get(i).text();
-                            summary = this.getSummary(td.get(i).getElementsByTag("a").attr("href"));
-                            break;
-                        case 2:
-                            author = td.get(i).text();
-                            break;
-                        case 3:
-                            source = td.get(i).text();
-                            break;
-                        case 4:
-                            date = td.get(i).text();
-                            break;
-                        case 5:
-                            db = td.get(i).text();
-                            break;
-                        case 6:
-                            ref = td.get(i).text();
-                            break;
-                        case 7:
-                            downloads = td.get(i).text();
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                Paper paper = new Paper(name, summary, author, source, db, date, ref, downloads);
-                System.out.println(paper);
-                // TODO save into db
+                this.getPaper(row);
             }
+            // get all page urls
+            String total_temp = content.get(0).select("span.countPageMark").text();
+            int totalPages = Integer.parseInt(total_temp.substring(2));
+            this.addURLs(nextPageList, totalPages);
+
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             webClient.close();
         }
         return document;
+    }
+
+    private void addURLs(List<String> urls, int total) {
+        StringBuilder url = new StringBuilder("https://kns.cnki.net/kns/brief/brief.aspx?curpage=");
+        for (int i = 2; i < total; i++) {
+            url.append(i);
+            url.append("&RecordsPerPage=20&QueryID=3&ID=&turnpage=1&tpagemode=L&dbPrefix=SCDB&Fields=&DisplayMode=listmode&PageName=ASP.brief_result_aspx&isinEn=1&");
+            urls.add(url.toString());
+        }
+    }
+
+    private WebClient getWebClient(){
+        // get webclient
+        WebClient webClient = new WebClient(BrowserVersion.CHROME);
+        webClient.getOptions().setCssEnabled(false);
+        webClient.getOptions().setJavaScriptEnabled(true);
+        webClient.setAjaxController(new NicelyResynchronizingAjaxController());
+        webClient.waitForBackgroundJavaScript(3000);
+        return webClient;
+    }
+
+    private Paper getPaper(Element row) throws IOException {
+        if (StringUtils.isBlank(row.attr("bgcolor")))
+            return null;
+        Elements td = row.getElementsByTag("td");
+        String name = null;
+        String summary = null;
+        String author = null;
+        String source = null;
+        String date = null;
+        String db = null;
+        String ref = null;
+        String downloads = null;
+        for (int i = 0; i < 8; i++) {
+            switch (i) {
+                case 1:
+                    name = td.get(i).text();
+                    summary = this.getSummary(td.get(i).getElementsByTag("a").attr("href"));
+                    break;
+                case 2:
+                    author = td.get(i).text();
+                    break;
+                case 3:
+                    source = td.get(i).text();
+                    break;
+                case 4:
+                    date = td.get(i).text();
+                    break;
+                case 5:
+                    db = td.get(i).text();
+                    break;
+                case 6:
+                    ref = td.get(i).text();
+                    break;
+                case 7:
+                    downloads = td.get(i).text();
+                    break;
+                default:
+                    break;
+            }
+        }
+        Paper paper = new Paper(name, summary, author, source, db, date, ref, downloads);
+        System.out.println(paper);
+        // TODO save into db
+        return paper;
     }
 
     private String getSummary(String href) throws IOException {
