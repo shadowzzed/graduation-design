@@ -54,8 +54,16 @@ public class WebReptile {
         dbname_pattern = Pattern.compile(dbname);
         filename_pattern = Pattern.compile(filename);
     }
-    //get cnki content
-    public Document getCNKIContent(String msg) {
+
+    /**
+     * 1. use the keyword to search for papers
+     * 2. get papers in first page
+     * 3. get total pages of result of this search
+     * 4. get papers in urls of list
+     * @param keyword
+     * @return
+     */
+    public Document getCNKIContent(String keyword) {
         List<String> nextPageList = new ArrayList<>();
         WebClient webClient = this.getWebClient();
         // get html page
@@ -66,13 +74,13 @@ public class WebReptile {
             if (htmlPage == null)
                 throw new NullPointerException("get no page");
             HtmlTextInput input = (HtmlTextInput) htmlPage.getElementById("txt_1_value1");
-            input.setValueAttribute(msg);
+            input.setValueAttribute(keyword);
             DomElement btnSearch = htmlPage.getElementById("btnSearch");
             HtmlPage htmlPage1 = (HtmlPage) btnSearch.click();
             String url = "https://kns.cnki.net/kns/brief/brief.aspx?pagename=ASP.brief_result_aspx&isinEn=1&dbPrefix=SCDB&dbCatalog=%e4%b8%ad%e5%9b%bd%e5%ad%a6%e6%9c%af%e6%96%87%e7%8c%ae%e7%bd%91%e7%bb%9c%e5%87%ba%e7%89%88%e6%80%bb%e5%ba%93&ConfigFile=SCDB.xml&research=off&t=";
             url += System.currentTimeMillis();
             url += "&keyValue=";
-            url += URLEncoder.encode(msg, "utf-8");
+            url += URLEncoder.encode(keyword, "utf-8");
             url += "&S=1&sorttype=";
             HtmlPage targetPage = (HtmlPage) webClient.getPage(url);
             // get content
@@ -80,14 +88,14 @@ public class WebReptile {
             // get table
             Elements content = document.getElementsByClass("pageBar_top").select("tr");
             // get each row
-            for (Element row: content) {
+            for (Element row: content)
                 this.getPaper(row);
-            }
             // get all page urls
             String total_temp = content.get(0).select("span.countPageMark").text();
             int totalPages = Integer.parseInt(total_temp.substring(2));
             this.addURLs(nextPageList, totalPages);
-
+            for (String nextURL: nextPageList)
+                this.getNextPagePaper(url, webClient);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -96,6 +104,7 @@ public class WebReptile {
         return document;
     }
 
+    // add urls to list
     private void addURLs(List<String> urls, int total) {
         StringBuilder url = new StringBuilder("https://kns.cnki.net/kns/brief/brief.aspx?curpage=");
         for (int i = 2; i < total; i++) {
@@ -103,6 +112,15 @@ public class WebReptile {
             url.append("&RecordsPerPage=20&QueryID=3&ID=&turnpage=1&tpagemode=L&dbPrefix=SCDB&Fields=&DisplayMode=listmode&PageName=ASP.brief_result_aspx&isinEn=1&");
             urls.add(url.toString());
         }
+    }
+
+    // get papers in next page
+    private void getNextPagePaper(String url, WebClient webClient) throws IOException {
+        HtmlPage page = (HtmlPage) webClient.getPage(url);
+        Document document = Jsoup.parse(page.asXml());
+        Elements rows = document.getElementsByClass("pageBar_top").select("tr");
+        for (Element row: rows)
+            this.getPaper(row);
     }
 
     private WebClient getWebClient(){
