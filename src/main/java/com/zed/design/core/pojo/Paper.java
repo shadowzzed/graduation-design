@@ -14,6 +14,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class Paper {
 
+    private String filecode;
+
     private String name;
 
     private String summary;

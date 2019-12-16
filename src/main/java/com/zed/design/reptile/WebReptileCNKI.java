@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
  * @contact shadowl91@163.com
  */
 @Component
-public class WebReptile {
+public class WebReptileCNKI {
 
     @Autowired
     private Config config;
@@ -137,49 +137,42 @@ public class WebReptile {
         if (StringUtils.isBlank(row.attr("bgcolor")))
             return null;
         Elements td = row.getElementsByTag("td");
-        String name = null;
-        String summary = null;
-        String author = null;
-        String source = null;
-        String date = null;
-        String db = null;
-        String ref = null;
-        String downloads = null;
+        Paper paper = new Paper();
         for (int i = 0; i < 8; i++) {
             switch (i) {
                 case 1:
-                    name = td.get(i).text();
-                    summary = this.getSummary(td.get(i).getElementsByTag("a").attr("href"));
+                    paper.setName(td.get(i).text());
+                    String href = td.get(i).getElementsByTag("a").attr("href");
+                    paper = this.getSummary(href);
                     break;
                 case 2:
-                    author = td.get(i).text();
+                    paper.setAuthor(td.get(i).text());
                     break;
                 case 3:
-                    source = td.get(i).text();
+                    paper.setSource(td.get(i).text());
                     break;
                 case 4:
-                    date = td.get(i).text();
+                    paper.setDate(td.get(i).text());
                     break;
                 case 5:
-                    db = td.get(i).text();
+                    paper.setDb(td.get(i).text());
                     break;
                 case 6:
-                    ref = td.get(i).text();
+                    paper.setRef(td.get(i).text());
                     break;
                 case 7:
-                    downloads = td.get(i).text();
+                    paper.setDownloads(td.get(i).text());
                     break;
                 default:
                     break;
             }
         }
-        Paper paper = new Paper(name, summary, author, source, db, date, ref, downloads);
-        System.out.println(paper);
         // TODO save into db
         return paper;
     }
 
-    private String getSummary(String href) throws IOException {
+    private Paper getSummary(String href) throws IOException {
+        Paper paper = new Paper();
         String url = "https://kns.cnki.net/KCMS/detail/detail.aspx?";
         Matcher dbcode = dbcode_pattern.matcher(href);
         Matcher dbname = dbname_pattern.matcher(href);
@@ -198,13 +191,16 @@ public class WebReptile {
             String filename_temp = filename.group();
             String filename_str = filename_temp.substring(9, filename_temp.length() - 1);
             url = url + "&filename=" + filename_str;
+            paper.setFilecode(filename_str);
         }
         Document document = Jsoup.connect(url)
                 .userAgent(UA)
                 .get();
         // TODO if is null there seem to be post on other websites still need to process
         if (document.getElementById("ChDivSummary") == null)
-            return null;
-        return document.getElementById("ChDivSummary").text();
+            paper.setSummary(null);
+        else
+            paper.setSummary(document.getElementById("ChDivSummary").text());
+        return paper;
     }
 }
